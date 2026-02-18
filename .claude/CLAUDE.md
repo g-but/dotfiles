@@ -389,6 +389,34 @@ Types: feat, fix, refactor, perf, test, docs, chore
 - Distinguish between "I don't know" and "I need to research this"
 - Ask clarifying questions before making assumptions on ambiguous requirements
 
+### Memory (Cross-Session Context)
+
+A memory MCP server is available. Use it to persist context across sessions so work never starts cold.
+
+**Session start — always do this first:**
+- Call `mcp__memory__search_nodes` with the project name to load prior context
+- If relevant entities exist, read them before touching any code
+
+**Save during a session when you:**
+- Make an architectural decision (entity: Decision, observation: what/why)
+- Discover a non-obvious pattern or gotcha in the codebase
+- Fix a recurring bug (entity: Bug, observation: root cause + fix)
+- Establish a convention the user confirms they want kept
+
+**Session end — before stopping:**
+- Save current work state: what was done, what's next, any open questions
+- Update the project entity's `currentState` observation
+
+**Entity naming convention:**
+```
+project:<name>        → top-level project context
+decision:<project>:<topic>  → architectural decisions
+bug:<project>:<area>        → known bugs and fixes
+pattern:<project>:<name>    → codebase patterns to follow
+```
+
+**What NOT to save:** transient debugging steps, things already in CLAUDE.md, obvious facts.
+
 ---
 
 ## Summary
