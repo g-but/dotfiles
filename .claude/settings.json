@@ -1,5 +1,4 @@
 {
-  "model": "sonnet",
   "hooks": {
     "Notification": [
       {
@@ -7,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus paplay /usr/share/sounds/freedesktop/stereo/message-new-instant.oga & DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus kdialog --passivepopup 'Claude Code is waiting for your input' 10 --title 'Claude Code'"
+            "command": "DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus kdialog --passivepopup 'Claude Code is waiting for your input' 10 --title 'Claude Code'"
           }
         ]
       }
@@ -30,6 +29,18 @@
           {
             "type": "command",
             "command": "/home/g/.claude/hooks/pre-tool-use.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/g/.claude/hooks/post-tool-use.sh",
+            "timeout": 35
           }
         ]
       }

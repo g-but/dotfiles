@@ -1,0 +1,77 @@
+#!/bin/bash
+# Global Git Pre-Push Hook
+# Uses Claude Code to review the diff for regressions before pushing
+#
+# Skip with: git push --no-verify
+
+CLAUDE="$HOME/.nvm/versions/node/v22.22.0/bin/claude"
+
+# Check if claude is available
+if [ ! -x "$CLAUDE" ]; then
+  echo "Warning: claude not found, skipping AI review"
+  exit 0
+fi
+
+# Read push info from stdin
+while read local_ref local_oid remote_ref remote_oid; do
+  # Skip delete pushes
+  if [ "$local_oid" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+
+  # Get the remote tracking branch or default to main
+  if [ "$remote_oid" = "0000000000000000000000000000000000000000" ]; then
+    # New branch — compare against main/master
+    BASE=$(git rev-parse --verify origin/main 2>/dev/null || git rev-parse --verify origin/master 2>/dev/null)
+    [ -z "$BASE" ] && continue
+  else
+    BASE="$remote_oid"
+  fi
+
+  DIFF=$(git diff "$BASE".."$local_oid" --stat 2>/dev/null)
+  DIFF_FULL=$(git diff "$BASE".."$local_oid" 2>/dev/null | head -c 8000)
+  FILES_CHANGED=$(echo "$DIFF" | wc -l)
+
+  # Skip tiny changes (1-2 files, likely trivial)
+  if [ "$FILES_CHANGED" -le 3 ]; then
+    exit 0
+  fi
+
+  echo "Running AI review on $FILES_CHANGED changed files..."
+
+  REVIEW=$($CLAUDE -p "You are reviewing a git diff before push. Be BRIEF (max 5 lines). Only flag REAL issues:
+- Bugs or logic errors
+- Security vulnerabilities
+- Accidentally committed secrets/debug code
+- Breaking changes without migration
+
+If everything looks fine, say 'LGTM' and nothing else. Do NOT comment on style, naming, or minor issues.
+
+Diff stat:
+$DIFF
+
+Diff (truncated):
+$DIFF_FULL" --max-turns 1 2>/dev/null)
+
+  if [ $? -ne 0 ]; then
+    echo "AI review failed (timeout/error), pushing anyway"
+    exit 0
+  fi
+
+  # If Claude found issues, show them but don't block
+  if echo "$REVIEW" | grep -qvi "LGTM"; then
+    echo ""
+    echo "--- AI Review ---"
+    echo "$REVIEW"
+    echo "-----------------"
+    echo ""
+    read -p "Push anyway? [Y/n] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+      echo "Push cancelled."
+      exit 1
+    fi
+  fi
+done
+
+exit 0

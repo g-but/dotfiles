@@ -24,7 +24,17 @@ link() {
 }
 
 echo "Installing dotfiles..."
+
+# Claude Code
 link .claude/CLAUDE.md
 link .claude/settings.json
 link .claude/hooks
+link .claude/skills/fix-types
+link .claude/skills/write-tests
+link .claude/skills/fix-lint
+
+# Git hooks
+link .config/git/hooks/pre-commit
+link .config/git/hooks/pre-push
+
 echo "Done."

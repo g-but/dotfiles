@@ -1,0 +1,32 @@
+#!/bin/bash
+# Global Git Pre-Commit Hook for Security
+# Scans for secrets before allowing commits
+
+GITLEAKS="$HOME/.local/bin/gitleaks"
+
+# Check if gitleaks is available
+if [ ! -x "$GITLEAKS" ]; then
+    echo "Warning: gitleaks not found at $GITLEAKS"
+    echo "Skipping secret scan..."
+    exit 0
+fi
+
+echo "Scanning for secrets..."
+
+# Run gitleaks on staged files
+$GITLEAKS protect --staged --no-banner --exit-code 1
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "COMMIT BLOCKED: Potential secrets detected!"
+    echo ""
+    echo "Review the findings above and either:"
+    echo "  1. Remove the secret from the file"
+    echo "  2. Add to .gitleaksignore if false positive"
+    echo ""
+    echo "To bypass (NOT RECOMMENDED): git commit --no-verify"
+    exit 1
+fi
+
+echo "No secrets detected. Commit allowed."
+exit 0
