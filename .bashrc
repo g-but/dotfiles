@@ -156,6 +156,95 @@ fi
 alias pig='openclaw tui --session "$(date +%s)"'
 
 # ═══════════════════════════════════════════════════
+# Dev Stack Manager
+# ═══════════════════════════════════════════════════
+# Usage: dev up revampit | dev down orangecat | dev status
+dev() {
+    local action="${1:-status}" project="${2:-}"
+
+    case "$action" in
+        up)
+            case "$project" in
+                revampit|ri)
+                    echo "Starting RevampIT stack..."
+                    docker compose -f ~/dev/revampit/docker-compose.yml up -d
+                    ;;
+                orangecat|oc)
+                    echo "Starting OrangeCat (Supabase) stack..."
+                    (cd ~/dev/orangecat && npx supabase start)
+                    # Supabase sets restart=always; override to prevent boot-start
+                    docker ps --filter "name=supabase_.*_orangecat" -q | xargs -r docker update --restart=no >/dev/null 2>&1
+                    ;;
+                *)
+                    echo "Unknown project: $project"
+                    echo "Available: revampit (ri), orangecat (oc)"
+                    return 1
+                    ;;
+            esac
+            ;;
+        down)
+            case "$project" in
+                revampit|ri)
+                    echo "Stopping RevampIT stack..."
+                    docker compose -f ~/dev/revampit/docker-compose.yml down
+                    ;;
+                orangecat|oc)
+                    echo "Stopping OrangeCat (Supabase) stack..."
+                    cd ~/dev/orangecat && npx supabase stop && cd - >/dev/null
+                    ;;
+                all)
+                    echo "Stopping all dev stacks..."
+                    docker compose -f ~/dev/revampit/docker-compose.yml down 2>/dev/null
+                    (cd ~/dev/orangecat && npx supabase stop) 2>/dev/null
+                    ;;
+                *)
+                    echo "Unknown project: $project"
+                    echo "Available: revampit (ri), orangecat (oc), all"
+                    return 1
+                    ;;
+            esac
+            ;;
+        status|st)
+            echo "Docker containers:"
+            docker ps --format "  {{.Names}}: {{.Status}} ({{.Ports}})" 2>/dev/null | sed 's/0.0.0.0://g; s/, \[::\]:[0-9->\/tcp]*//g' || echo "  Docker not running"
+            ;;
+        *)
+            echo "Usage: dev <up|down|status> [project]"
+            echo "Projects: revampit (ri), orangecat (oc), all"
+            ;;
+    esac
+}
+
+# ═══════════════════════════════════════════════════
+# Git Health — check all repos at once
+# ═══════════════════════════════════════════════════
+git-health() {
+    local dev_dir="${1:-$HOME/dev}"
+    local dirty=0 ahead=0 clean=0
+
+    for d in "$dev_dir"/*/; do
+        [ -d "$d/.git" ] || continue
+        local name=$(basename "$d")
+        local status=""
+
+        local n_dirty=$(git -C "$d" status --porcelain 2>/dev/null | wc -l)
+        local n_ahead=$(git -C "$d" log --oneline @{u}..HEAD 2>/dev/null | wc -l)
+        local branch=$(git -C "$d" branch --show-current 2>/dev/null)
+
+        if [ "$n_dirty" -gt 0 ] || [ "$n_ahead" -gt 0 ]; then
+            [ "$n_dirty" -gt 0 ] && status+=" ${n_dirty} dirty" && ((dirty++))
+            [ "$n_ahead" -gt 0 ] && status+=" ${n_ahead} unpushed" && ((ahead++))
+            printf "  \033[33m%-20s\033[0m (%s)%s\n" "$name" "$branch" "$status"
+        else
+            ((clean++))
+        fi
+    done
+
+    echo ""
+    echo "  $clean clean, $dirty dirty, $ahead with unpushed commits"
+}
+
+# ═══════════════════════════════════════════════════
 # Zellij Auto-Attach
 # ═══════════════════════════════════════════════════
 if [ -z "${ZELLIJ:-}" ] && command -v zellij >/dev/null 2>&1; then
