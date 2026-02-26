@@ -50,6 +50,9 @@ link .config/zellij/layouts/projects.kdl
 # Project mapping
 link .config/claude-projects.conf
 
+# Editor
+link .editorconfig
+
 # SSH config (not keys)
 link .ssh/config
 
