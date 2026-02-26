@@ -39,7 +39,6 @@ _add_to_path() {
     esac
 }
 _add_to_path "$HOME/.local/bin"
-_add_to_path "$HOME/.npm-global/bin"
 _add_to_path "$HOME/dev/revampit/scripts"
 _add_to_path "$HOME/dev/fitfoot"
 _add_to_path "$HOME/.opencode/bin"
@@ -327,5 +326,5 @@ claude() {
     fi
 
     echo "$PROJECT|$(date +%s)|$(pwd)" > "$SESSION_FILE"
-    /home/g/.npm-global/bin/claude "$@"
+    command claude "$@"
 }
