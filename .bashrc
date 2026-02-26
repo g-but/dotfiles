@@ -1,0 +1,242 @@
+# ~/.bashrc: executed by bash(1) for non-login shells.
+
+# If not running interactively, don't do anything
+case $- in
+    *i*) ;;
+      *) return;;
+esac
+
+# ═══════════════════════════════════════════════════
+# History
+# ═══════════════════════════════════════════════════
+HISTCONTROL=ignoreboth:erasedups
+shopt -s histappend
+HISTSIZE=50000
+HISTFILESIZE=100000
+# Save history after every command (survive crashes)
+PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
+
+# ═══════════════════════════════════════════════════
+# Shell Options
+# ═══════════════════════════════════════════════════
+shopt -s checkwinsize
+shopt -s globstar
+# cd into directory by typing its name
+shopt -s autocd 2>/dev/null
+# Correct minor cd typos
+shopt -s cdspell 2>/dev/null
+
+# Make less more friendly for non-text input files
+[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+
+# ═══════════════════════════════════════════════════
+# PATH (deduplicated, order matters)
+# ═══════════════════════════════════════════════════
+_add_to_path() {
+    case ":$PATH:" in
+        *":$1:"*) ;;
+        *) PATH="$1:$PATH" ;;
+    esac
+}
+_add_to_path "$HOME/.local/bin"
+_add_to_path "$HOME/.npm-global/bin"
+_add_to_path "$HOME/dev/revampit/scripts"
+_add_to_path "$HOME/dev/fitfoot"
+_add_to_path "$HOME/.opencode/bin"
+_add_to_path "$HOME/.bun/bin"
+export PATH
+
+# ═══════════════════════════════════════════════════
+# Prompt (Starship)
+# ═══════════════════════════════════════════════════
+if command -v starship >/dev/null 2>&1; then
+    eval "$(starship init bash)"
+else
+    # Fallback prompt
+    PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+fi
+
+# ═══════════════════════════════════════════════════
+# Color Support
+# ═══════════════════════════════════════════════════
+if [ -x /usr/bin/dircolors ]; then
+    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+fi
+
+# ═══════════════════════════════════════════════════
+# Aliases — modern replacements
+# ═══════════════════════════════════════════════════
+# ls → eza
+if command -v eza >/dev/null 2>&1; then
+    alias ls='eza --icons'
+    alias ll='eza -la --icons --git'
+    alias la='eza -a --icons'
+    alias l='eza --icons'
+    alias tree='eza --tree --icons'
+else
+    alias ls='ls --color=auto'
+    alias ll='ls -alF'
+    alias la='ls -A'
+    alias l='ls -CF'
+fi
+
+# cat → bat
+if command -v bat >/dev/null 2>&1; then
+    alias cat='bat --paging=never'
+    alias catp='bat'  # with pager
+fi
+
+# grep with color
+alias grep='grep --color=auto'
+
+# git shortcuts
+alias gs='git status'
+alias gd='git diff'
+alias gl='git log --oneline -20'
+alias gp='git push'
+
+# project shortcuts
+alias stop-dev='pkill -f "next dev" && pkill -f "strapi develop" && pkill -f "concurrently"'
+alias code='flatpak run com.visualstudio.code'
+
+alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
+
+# ═══════════════════════════════════════════════════
+# Completions
+# ═══════════════════════════════════════════════════
+if ! shopt -oq posix; then
+    if [ -f /usr/share/bash-completion/bash_completion ]; then
+        . /usr/share/bash-completion/bash_completion
+    elif [ -f /etc/bash_completion ]; then
+        . /etc/bash_completion
+    fi
+fi
+
+# ═══════════════════════════════════════════════════
+# Tool Integrations
+# ═══════════════════════════════════════════════════
+
+# direnv
+if command -v direnv >/dev/null 2>&1; then
+    eval "$(direnv hook bash)"
+fi
+
+# fzf — fuzzy finder (Ctrl+R history, Ctrl+T files, Alt+C dirs)
+if command -v fzf >/dev/null 2>&1; then
+    eval "$(fzf --bash)"
+fi
+
+# zoxide — smart cd
+if command -v zoxide >/dev/null 2>&1; then
+    eval "$(zoxide init bash)"
+fi
+
+# nvm
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+
+# Homebrew (after PATH so it doesn't duplicate)
+if [ -f /home/linuxbrew/.linuxbrew/bin/brew ]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+fi
+
+# git — use delta as pager
+if command -v delta >/dev/null 2>&1; then
+    export GIT_PAGER="delta"
+fi
+
+# OpenClaw
+if [ -f "$HOME/.openclaw/completions/openclaw.bash" ]; then
+    source "$HOME/.openclaw/completions/openclaw.bash"
+fi
+alias pig='openclaw tui --session "$(date +%s)"'
+
+# ═══════════════════════════════════════════════════
+# Zellij Auto-Attach
+# ═══════════════════════════════════════════════════
+if [ -z "${ZELLIJ:-}" ] && command -v zellij >/dev/null 2>&1; then
+    if zellij list-sessions -ns 2>/dev/null | grep -q .; then
+        zellij attach
+    else
+        zellij -l projects
+    fi
+fi
+
+# ═══════════════════════════════════════════════════
+# Claude Code — Session Recovery with Zellij Tab Awareness
+# ═══════════════════════════════════════════════════
+_claude_resolve_project_dir() {
+    local CONFIG="$HOME/.config/claude-projects.conf"
+    [ -f "$CONFIG" ] || return 1
+
+    local TAB_NAME TMP="/tmp/_claude_zt_$$.txt"
+    zellij action dump-layout > "$TMP" 2>/dev/null
+    TAB_NAME=$(grep 'focus=true' "$TMP" | grep 'tab name=' | sed 's/.*tab name="\([^"]*\)".*/\1/')
+    rm -f "$TMP"
+    [ -z "$TAB_NAME" ] && return 1
+
+    local DIR
+    DIR=$(while IFS='|' read -r name dir; do
+        [[ "$name" =~ ^#.*$ ]] && continue
+        [ -z "$name" ] && continue
+        local clean_tab=$(echo "$TAB_NAME" | sed 's/[$[:space:]]*$//')
+        local clean_name=$(echo "$name" | sed 's/[$[:space:]]*$//')
+        if [ "${clean_tab,,}" = "${clean_name,,}" ]; then
+            echo "$dir"
+            break
+        fi
+    done < "$CONFIG")
+
+    [ -z "$DIR" ] && return 1
+    [ -d "$DIR" ] || return 1
+    echo "$DIR"
+}
+
+claude() {
+    if [ "$PWD" = "$HOME" ] && [ -n "${ZELLIJ:-}" ]; then
+        local PROJECT_DIR
+        PROJECT_DIR=$(_claude_resolve_project_dir)
+        if [ -n "$PROJECT_DIR" ]; then
+            echo "  -> Tab -> $PROJECT_DIR"
+            cd "$PROJECT_DIR" || true
+        fi
+    fi
+
+    local SESSION_DIR="$HOME/.claude/sessions"
+    mkdir -p "$SESSION_DIR"
+
+    local DIR_HASH=$(echo "$(pwd)" | md5sum | cut -d' ' -f1)
+    local SESSION_FILE="$SESSION_DIR/$DIR_HASH.txt"
+    local PROJECT=$(basename "$(pwd)")
+
+    if [ -f "$SESSION_FILE" ]; then
+        local SAVED_TIME=$(cut -d'|' -f2 "$SESSION_FILE" 2>/dev/null || echo "0")
+        local NOW=$(date +%s)
+        local DIFF=$((NOW - SAVED_TIME))
+
+        if [ $DIFF -gt 120 ] && [ $DIFF -lt 172800 ]; then
+            local SAVED_PROJECT=$(cut -d'|' -f1 "$SESSION_FILE")
+            local HOURS=$((DIFF / 3600))
+            local MINS=$(((DIFF % 3600) / 60))
+
+            local TIME_AGO=""
+            if [ $HOURS -gt 0 ]; then
+                TIME_AGO="${HOURS}h ${MINS}m ago"
+            else
+                TIME_AGO="${MINS}m ago"
+            fi
+
+            echo ""
+            echo "  Previous session: $SAVED_PROJECT ($TIME_AGO)"
+            echo "  Tell Claude: \"continue\""
+            echo ""
+        fi
+    fi
+
+    echo "$PROJECT|$(date +%s)|$(pwd)" > "$SESSION_FILE"
+    /home/g/.npm-global/bin/claude "$@"
+}

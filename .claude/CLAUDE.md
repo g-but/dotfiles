@@ -2,7 +2,7 @@
 
 **Purpose**: Single Source of Truth for universal engineering principles.
 **Usage**: Import in project CLAUDE.md files with `@~/.claude/CLAUDE.md`
-**Last Updated**: 2026-02-11
+**Last Updated**: 2026-02-24
 
 ---
 
@@ -391,25 +391,51 @@ Types: feat, fix, refactor, perf, test, docs, chore
 
 ### Memory (Cross-Session Context)
 
-A memory MCP server is available. Use it to persist context across sessions so work never starts cold.
+A memory MCP server is available. Use it to persist context across sessions so work never starts cold. Sessions can die at any time (crash, restart, network drop) — save state **continuously**, not just at exit.
 
-**Session start — always do this first:**
-- Call `mcp__memory__search_nodes` with the project name to load prior context
-- If relevant entities exist, read them before touching any code
+**Session start — do this on the FIRST user message of every session:**
+- **Step 1: Detect project from zellij tab** (if `$HOME` and `ZELLIJ` is set):
+  1. Run this exact command (piping dump-layout is unreliable — must use temp file):
+     ```bash
+     zellij action dump-layout > /tmp/_zt.txt 2>/dev/null && grep 'focus=true' /tmp/_zt.txt | grep 'tab name=' | sed 's/.*tab name="\([^"]*\)".*/\1/' && rm -f /tmp/_zt.txt
+     ```
+  2. Clean the tab name: strip trailing `$` and whitespace, then match case-insensitively against `~/.config/claude-projects.conf` (format: `tab_name|directory`)
+  3. If found and directory exists, `cd` to it and tell the user: "Detected project: X (from zellij tab)"
+- **Step 2: Search for active sessions** (ALWAYS, even if tab detection failed):
+  1. Call `mcp__memory__search_nodes` with query `"session:"` to find ALL `session:*` entities
+  2. If tab matched a project: call `mcp__memory__open_nodes` with `["session:<project>", "project:<project>"]`
+  3. If tab did NOT match but `session:*` entities exist: list them and ask the user which to continue (or which project to work on)
+  4. If tab did NOT match and no sessions exist: ask the user which project to work on
+- **Step 3: Offer to resume** if a session entity has unfinished work:
+  - If `activeTask` is NOT "DONE"/"COMPLETED": summarize and offer to continue
+  - If `activeTask` says done but has a `nextStep`: mention what was completed and suggest the next step
+  - Read relevant `project:<name>` entity for full context before touching any code
 
-**Save during a session when you:**
-- Make an architectural decision (entity: Decision, observation: what/why)
-- Discover a non-obvious pattern or gotcha in the codebase
-- Fix a recurring bug (entity: Bug, observation: root cause + fix)
-- Establish a convention the user confirms they want kept
+**Save continuously — after every meaningful milestone:**
+- Completed a feature, fix, or refactor → update `project:<name>` with `currentState` observation
+- Made an architectural decision → create `decision:<project>:<topic>` entity
+- Discovered a non-obvious pattern or gotcha → create `pattern:<project>:<name>` entity
+- Fixed a recurring bug → create `bug:<project>:<area>` entity
+- Established a convention the user confirms → save it
 
-**Session end — before stopping:**
-- Save current work state: what was done, what's next, any open questions
-- Update the project entity's `currentState` observation
+**Track active work — REPLACE (not append) `session:<project>` entity:**
+- **CRITICAL**: Always use `delete_entities` then `create_entities` to replace the session entity. NEVER use `add_observations` — it appends, creating stale history that confuses future session detection.
+- **When starting a task**: delete+recreate `session:<project>` with what you're about to do
+- **After each commit or significant step**: delete+recreate with current state
+- **When finishing all work**: delete the `session:<project>` entity (clean state = no active work)
+
+The `session:<project>` entity should contain exactly ONE observation with ALL of:
+- `activeTask`: what is currently being worked on (specific enough to resume)
+- `progress`: what steps are done, what remains
+- `uncommittedChanges`: description of any unsaved/uncommitted work
+- `nextStep`: the immediate next action to take
+
+This way, if the session dies mid-task, the next session can pick up exactly where it left off.
 
 **Entity naming convention:**
 ```
-project:<name>        → top-level project context
+project:<name>              → top-level project context (long-lived)
+session:<project>           → active work in progress (ephemeral, deleted when done)
 decision:<project>:<topic>  → architectural decisions
 bug:<project>:<area>        → known bugs and fixes
 pattern:<project>:<name>    → codebase patterns to follow

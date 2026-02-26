@@ -33,8 +33,24 @@ link .claude/skills/fix-types
 link .claude/skills/write-tests
 link .claude/skills/fix-lint
 
-# Git hooks
+# Git
 link .config/git/hooks/pre-commit
 link .config/git/hooks/pre-push
+link .config/git/ignore
+
+# Shell
+link .bashrc
+
+# Terminal
+link .config/kitty/kitty.conf
+link .config/starship.toml
+link .config/zellij/config.kdl
+link .config/zellij/layouts/projects.kdl
+
+# Project mapping
+link .config/claude-projects.conf
+
+# SSH config (not keys)
+link .ssh/config
 
 echo "Done."

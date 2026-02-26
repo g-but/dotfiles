@@ -1,0 +1,14 @@
+// Minimal Zellij config for reliable sessions
+pane_frames true
+theme "default"
+ui {
+  pane_frames true
+}
+
+// Keep scrollback in terminal manageable; use Zellij scrollback/search
+scrollback_lines 10000
+
+// After crash, zellij discovers the deepest subprocess (playwright-mcp, ref-tools-mcp)
+// instead of the parent shell. Replace ALL resurrected commands with bash so panes
+// get working shells. Claude's memory handles session context, not zellij.
+post_command_discovery_hook "echo /bin/bash"
