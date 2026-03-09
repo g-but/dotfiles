@@ -123,6 +123,12 @@ fi
 # fzf — fuzzy finder (Ctrl+R history, Ctrl+T files, Alt+C dirs)
 if command -v fzf >/dev/null 2>&1; then
     eval "$(fzf --bash)"
+    # Use fd for faster, gitignore-aware file search
+    if command -v fd >/dev/null 2>&1; then
+        export FZF_DEFAULT_COMMAND='fd --type f --hidden --exclude .git'
+        export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+        export FZF_ALT_C_COMMAND='fd --type d --hidden --exclude .git'
+    fi
 fi
 
 # zoxide — smart cd
@@ -130,18 +136,52 @@ if command -v zoxide >/dev/null 2>&1; then
     eval "$(zoxide init bash)"
 fi
 
-# nvm
+# nvm (lazy-loaded — only sources on first use of nvm/node/npm/npx/pnpm)
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    # Add nvm's current node to PATH immediately (instant node/npm without full nvm load)
+    _NVM_DEFAULT=$(cat "$NVM_DIR/alias/default" 2>/dev/null)
+    if [ -n "$_NVM_DEFAULT" ]; then
+        for d in "$NVM_DIR/versions/node"/v${_NVM_DEFAULT}*/bin; do
+            [ -d "$d" ] && _add_to_path "$d" && break
+        done
+    fi
+    unset _NVM_DEFAULT
+
+    _nvm_lazy_load() {
+        unset -f nvm node npm npx pnpm corepack 2>/dev/null
+        \. "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    }
+    nvm() { _nvm_lazy_load; nvm "$@"; }
+
+    # Auto-switch Node version when entering a dir with .nvmrc
+    _nvm_auto_switch() {
+        if [ "$PWD" != "${_NVM_LAST_DIR:-}" ] && [ -f ".nvmrc" ]; then
+            _NVM_LAST_DIR="$PWD"
+            _nvm_lazy_load
+            nvm use --silent 2>/dev/null
+        elif [ "$PWD" != "${_NVM_LAST_DIR:-}" ]; then
+            _NVM_LAST_DIR="$PWD"
+        fi
+    }
+    PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}_nvm_auto_switch"
+fi
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
 
-# Homebrew (after PATH so it doesn't duplicate)
-if [ -f /home/linuxbrew/.linuxbrew/bin/brew ]; then
-    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+# Homebrew (cached — regenerates only when brew binary changes)
+_BREW_BIN="/home/linuxbrew/.linuxbrew/bin/brew"
+if [ -f "$_BREW_BIN" ]; then
+    _BREW_ENV_CACHE="$HOME/.cache/brew-shellenv.sh"
+    if [ ! -f "$_BREW_ENV_CACHE" ] || [ "$_BREW_BIN" -nt "$_BREW_ENV_CACHE" ]; then
+        env -i HOME="$HOME" SHELL="$SHELL" "$_BREW_BIN" shellenv > "$_BREW_ENV_CACHE"
+    fi
+    source "$_BREW_ENV_CACHE"
+    unset _BREW_ENV_CACHE
 fi
+unset _BREW_BIN
 
 # git — use delta as pager
 if command -v delta >/dev/null 2>&1; then
@@ -153,6 +193,14 @@ if [ -f "$HOME/.openclaw/completions/openclaw.bash" ]; then
     source "$HOME/.openclaw/completions/openclaw.bash"
 fi
 alias pig='openclaw tui --session "$(date +%s)"'
+
+# GitHub CLI shortcuts
+alias ghi='gh issue list'
+alias ghic='gh issue create'
+alias ghpr='gh pr list'
+alias ghprc='gh pr create'
+alias ghprv='gh pr view --web'
+alias ghrc='gh repo clone'
 
 # ═══════════════════════════════════════════════════
 # Dev Stack Manager

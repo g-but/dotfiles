@@ -1,5 +1,4 @@
 {
-  "autoUpdatesChannel": "stable",
   "hooks": {
     "Notification": [
       {
@@ -46,5 +45,6 @@
         ]
       }
     ]
-  }
+  },
+  "autoUpdatesChannel": "stable"
 }

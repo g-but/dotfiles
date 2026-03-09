@@ -6,10 +6,32 @@
 
 CLAUDE="$HOME/.nvm/versions/node/v22.22.0/bin/claude"
 
+# --- GPG Signature Verification ---
+# Warn (don't block) if unsigned commits are about to be pushed
+_check_signatures() {
+  local base="$1" head="$2"
+  local unsigned
+  unsigned=$(git log --pretty=format:'%H %G? %s' "$base".."$head" 2>/dev/null | grep ' N ' | head -5)
+  if [ -n "$unsigned" ]; then
+    echo ""
+    echo "WARNING: Unsigned commits detected:"
+    echo "$unsigned" | while read hash status msg; do
+      echo "  $(echo "$hash" | cut -c1-8) $msg"
+    done
+    echo ""
+    read -p "Push unsigned commits? [Y/n] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+      echo "Push cancelled. Sign commits with: git commit --amend -S"
+      exit 1
+    fi
+  fi
+}
+
 # Check if claude is available
 if [ ! -x "$CLAUDE" ]; then
   echo "Warning: claude not found, skipping AI review"
-  exit 0
+  # Still check signatures even without Claude
 fi
 
 # Read push info from stdin
@@ -27,6 +49,9 @@ while read local_ref local_oid remote_ref remote_oid; do
   else
     BASE="$remote_oid"
   fi
+
+  # Check GPG signatures first (fast)
+  _check_signatures "$BASE" "$local_oid"
 
   DIFF=$(git diff "$BASE".."$local_oid" --stat 2>/dev/null)
   DIFF_FULL=$(git diff "$BASE".."$local_oid" 2>/dev/null | head -c 8000)

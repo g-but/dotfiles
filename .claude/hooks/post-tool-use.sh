@@ -18,15 +18,26 @@ if [[ "$FILE_PATH" == *.d.ts || "$FILE_PATH" == */node_modules/* ]]; then
 fi
 
 # Debounce: skip if a typecheck ran in the last 15 seconds
+# Uses flock for atomic lock (no TOCTOU race condition)
 LOCKFILE="/tmp/claude-typecheck-lock"
-if [ -f "$LOCKFILE" ]; then
-  LAST=$(stat -c %Y "$LOCKFILE" 2>/dev/null || echo 0)
-  NOW=$(date +%s)
-  if (( NOW - LAST < 15 )); then
-    exit 0
-  fi
+LOCKFD=9
+
+# Open lock file descriptor
+exec 9>"$LOCKFILE"
+
+# Non-blocking trylock — if another typecheck is running, skip
+if ! flock -n $LOCKFD; then
+  exit 0
 fi
-touch "$LOCKFILE"
+
+# Check debounce timestamp (stored separately from the lock fd)
+STAMPFILE="/tmp/claude-typecheck-stamp"
+NOW=$(date +%s)
+LAST=$(cat "$STAMPFILE" 2>/dev/null || echo 0)
+if (( NOW - LAST < 15 )); then
+  exit 0
+fi
+echo "$NOW" > "$STAMPFILE"
 
 # Find project root
 DIR="$CWD"

@@ -395,10 +395,12 @@ A memory MCP server is available. Use it to persist context across sessions so w
 
 **Session start — do this on the FIRST user message of every session:**
 - **Step 1: Detect project from zellij tab** (if `$HOME` and `ZELLIJ` is set):
-  1. Run this exact command (piping dump-layout is unreliable — must use temp file):
+  1. Run this exact command to find which tab this Claude process is in:
      ```bash
-     zellij action dump-layout > /tmp/_zt.txt 2>/dev/null && grep 'focus=true' /tmp/_zt.txt | grep 'tab name=' | sed 's/.*tab name="\([^"]*\)".*/\1/' && rm -f /tmp/_zt.txt
+     # Find our shell (parent of claude), then zellij server (parent of shell), then correlate tab names with zellij's child PIDs
+     _SHELL_PID=$(ps -o ppid= -p $PPID | tr -d ' ') && _ZS=$(ps -o ppid= -p $_SHELL_PID | tr -d ' ') && _TABS=$(zellij action query-tab-names 2>/dev/null) && _PIDS=$(ps -o pid= --ppid $_ZS 2>/dev/null | tr -d ' ') && paste <(echo "$_TABS") <(echo "$_PIDS") | while IFS=$'\t' read -r tab pid; do [ "$pid" = "$_SHELL_PID" ] && echo "$tab" && break; done
      ```
+     **Why**: `focus=true` in dump-layout tracks the *viewed* tab, not the tab running Claude. Instead, this walks the process tree: `claude (PPID)` → `bash shell` → `zellij server`, then correlates `query-tab-names` order with zellij's child PIDs to find the tab owning our shell.
   2. Clean the tab name: strip trailing `$` and whitespace, then match case-insensitively against `~/.config/claude-projects.conf` (format: `tab_name|directory`)
   3. If found and directory exists, `cd` to it and tell the user: "Detected project: X (from zellij tab)"
 - **Step 2: Search for active sessions** (ALWAYS, even if tab detection failed):
