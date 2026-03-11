@@ -10,3 +10,4 @@ known_hosts*
 settings.local.json
 *.backup*
 *.bak
+.env

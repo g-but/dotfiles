@@ -376,3 +376,6 @@ claude() {
     echo "$PROJECT|$(date +%s)|$(pwd)" > "$SESSION_FILE"
     command claude "$@"
 }
+
+# Secrets (passwords, tokens) — loaded from .env, which is gitignored
+[ -f "$HOME/.env" ] && source "$HOME/.env"

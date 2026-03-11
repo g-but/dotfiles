@@ -39,8 +39,8 @@ if (( NOW - LAST < 15 )); then
 fi
 echo "$NOW" > "$STAMPFILE"
 
-# Find project root
-DIR="$CWD"
+# Find project root — start from file's directory (not CWD, which may differ)
+DIR=$(dirname "$FILE_PATH")
 while [ "$DIR" != "/" ]; do
   if [ -f "$DIR/package.json" ]; then
     PROJECT_ROOT="$DIR"
